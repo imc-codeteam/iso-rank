@@ -32,12 +32,7 @@
 #include <ctime>
 #include "Matrices/SymMatrix.h"
 #include "Matrices/DenseMatrix1D.h"
-#include "Matrices/MPI_Structs.h"
 #include "IsoRank.h"
-
-#ifdef USE_MPI
-#include "mpi.h"
-#endif
 
 /*
  * Path to the graph folders.

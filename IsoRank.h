@@ -177,7 +177,7 @@ struct IsoRank_Result isoRank(DenseMatrix1D<T>& matrix_A, DenseMatrix1D<T>& matr
                 else{
                     int b_size=matrix_B.getNumberOfRows();
                     int a_size=matrix_A.getNumberOfRows();
-                    DenseMatrix1D<float> matrix_A2(b_size,b_size);
+                    DenseMatrix1D<T> matrix_A2(b_size,b_size);
                     
                     for(int r=0;r<b_size;r++){
                         for(int s=0;s<b_size;s++){
@@ -199,7 +199,7 @@ struct IsoRank_Result isoRank(DenseMatrix1D<T>& matrix_A, DenseMatrix1D<T>& matr
                     DenseMatrix1D<T> final_mat=product*get_transpose;
                     DenseMatrix1D<T> ret_matrix= matrix_A-final_mat;
                     
-                    float frob_norm_hold=ret_matrix.getFrobNorm(); 
+                    T frob_norm_hold=ret_matrix.getFrobNorm(); 
                     
                     if(frob_norm_hold<best_frob_norm){
                         best_frob_norm=frob_norm_hold;

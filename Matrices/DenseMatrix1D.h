@@ -17,21 +17,9 @@
 #include "MatrixExceptions.h"
 #include "SparseElement.h"
 
-#ifdef ARPACK
-#include "dsmatrxa.h"
-#include "ardsmat.h"
-#include "ardssym.h"
-#include "lsymsol.h"
-#endif
-
 #ifdef EIGEN
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
-#endif
-
-#ifdef USE_MPI
-#include "mpi.h"
-#include "MPI_Structs.h"
 #endif
 
 template <typename T>
@@ -74,12 +62,7 @@ public:
     DenseMatrix1D(int, int, bool fill = true);
     DenseMatrix1D(const DenseMatrix1D<T>&);
     DenseMatrix1D(const std::string&);
-
-    #ifdef USE_MPI
-    DenseMatrix1D(int,MPI_Status&);
-    DenseMatrix1D(int,int,MPI_Status&);
-    #endif
-    
+  
     /************
      *Destructor*
      ************/
@@ -160,6 +143,7 @@ inline DenseMatrix1D<T>::DenseMatrix1D(const std::string& file_path)
 {
     int tmp_x;
     int tmp_y;
+    T tmp_val;
     std::ifstream file_reader;
     file_reader.open(file_path.c_str());
     
@@ -179,7 +163,8 @@ inline DenseMatrix1D<T>::DenseMatrix1D(const std::string& file_path)
     {
         file_reader >> tmp_x;
         file_reader >> tmp_y;
-        (*this)(tmp_x - 1 ,tmp_y - 1) = _DEFAULT_MATRIX_ENTRY;
+        file_reader >> tmp_val;
+        (*this)(tmp_x - 1 ,tmp_y - 1) = tmp_val;
     }
     
     file_reader.close();
@@ -199,136 +184,6 @@ inline DenseMatrix1D<T>::DenseMatrix1D(int rows, int cols, bool fill)
     this->_cols = cols;
     _initializeMatrix(fill);
 }
-
-#ifdef USE_MPI
-/*
- * DensMatrix constructor:
- * Construct a matrix by receiving matrix data from a MPI_Send_Matrix call.
- * Note the matrix being send should be of type DenseMatrix1D, DenseMatrix2D, SymmMatrix
- * @pram int source: Sender's ID
- * @pram int tag: sender's tag
- * @pram MPI_Status: MPI_Status object
- */
-template <typename T>
-inline DenseMatrix1D<T>::DenseMatrix1D(int source, int tag, MPI_Status& stat)
-{
-    MPI_MatrixInfo mat_info;
-    MPI_Recv(&mat_info, sizeof(MPI_MatrixInfo), MPI_BYTE, source, tag + 1, MPI_COMM_WORLD, &stat);
-    if(mat_info.send_form == _SYM_DENSE_FORM)
-    {
-        this->_rows = mat_info.rows;
-        this->_cols = mat_info.cols;
-        _initializeMatrix(false);
-        T* recv_edges = new T[mat_info.recv_size];
-        MPI_Recv(recv_edges, mat_info.recv_size*sizeof(T), MPI_BYTE, source, tag + 2, MPI_COMM_WORLD, &stat);
-
-        int counter = 0;
-        for (int i = 0; i < this->_rows; i++)
-        {
-            for (int j = 0; j <= i; j++)
-            {
-               this->_edges[j*this->_cols + i] = this->_edges[i * this->_cols + j] = recv_edges[counter++];  
-            }
-        }
-        delete [] recv_edges;
-    }
-    else if (mat_info.send_form == _DENSE_FORM)
-    {
-        this->_rows = mat_info.rows;
-        this->_cols = mat_info.cols;
-        _initializeMatrix(false);
-        MPI_Recv(this->_edges, mat_info.recv_size*sizeof(T), MPI_BYTE, source, tag + 2, MPI_COMM_WORLD, &stat);
-    }
-    else if (mat_info.send_form == _SYM_SPARSE_FORM)
-    {
-        this->_rows = mat_info.rows;
-        this->_cols = mat_info.cols;
-        _initializeMatrix(true);
-        std::vector<SparseElement<T> > recv_edges(mat_info.recv_size);
-        MPI_Recv(&recv_edges[0], mat_info.recv_size*sizeof(SparseElement<T>), MPI_BYTE, source, tag + 2, MPI_COMM_WORLD, &stat);
-
-        for(int i = 0;  i < mat_info.recv_size; i++)
-        {
-            (*this)(recv_edges[i].getJ(),recv_edges[i].getI()) = (*this)(recv_edges[i].getI(), recv_edges[i].getJ()) = recv_edges[i].getValue();
-        }
-    }
-    else if (mat_info.send_form == _SPARSE_FORM)
-    {
-        this->_rows = mat_info.rows;
-        this->_cols = mat_info.cols;
-        _initializeMatrix(true);
-        std::vector<SparseElement<T> > recv_edges(mat_info.recv_size);
-        MPI_Recv(&recv_edges[0], mat_info.recv_size*sizeof(SparseElement<T>), MPI_BYTE, source, tag + 2, MPI_COMM_WORLD, &stat);
-        for(int i = 0;  i < mat_info.recv_size; i++)
-        {
-            (*this)(recv_edges[i].getI(), recv_edges[i].getJ()) = recv_edges[i].getValue();
-        }
-    }
-}
-
-/*
- * DensMatrix constructor:
- * Construct a matrix by receiving matrix data from a MPI_Bcast_Send_Matrix call.
- * Note the matrix being send should be of type DenseMatrix1D, DenseMatrix2D, SymmMatrix
- * @pram int source: Sender's ID
- * @pram MPI_Status: MPI_Status object
- */
-template <typename T>
-inline DenseMatrix1D<T>::DenseMatrix1D(int source, MPI_Status& stat)
-{
-    MPI_MatrixInfo mat_info;
-    MPI_Bcast(&mat_info, sizeof(MPI_MatrixInfo), MPI_BYTE, source, MPI_COMM_WORLD);
-    if(mat_info.send_form == _SYM_DENSE_FORM)
-    {
-        this->_rows = mat_info.rows;
-        this->_cols = mat_info.cols;
-        _initializeMatrix(true);
-        T* recv_edges = new T[mat_info.recv_size];
-        MPI_Bcast(recv_edges, mat_info.recv_size*sizeof(T), MPI_BYTE, source, MPI_COMM_WORLD);
-
-        int counter = 0;
-        for (int i = 0; i < this->_rows; i++)
-        {
-            for (int j = 0; j <= i; j++)
-            {
-               this->_edges[j*this->_cols + i] = this->_edges[i * this->_cols + j] = recv_edges[counter++];  
-            }
-        }
-        delete [] recv_edges;
-    }
-    else if (mat_info.send_form == _DENSE_FORM)
-    {
-        this->_rows = mat_info.rows;
-        this->_cols = mat_info.cols;
-        _initializeMatrix(false);
-        MPI_Bcast(this->_edges, mat_info.recv_size*sizeof(T), MPI_BYTE, source, MPI_COMM_WORLD);
-    }
-    else if (mat_info.send_form == _SYM_SPARSE_FORM)
-    {
-        this->_rows = mat_info.rows;
-        this->_cols = mat_info.cols;
-        _initializeMatrix(true);
-        std::vector<SparseElement<T> > recv_edges(mat_info.recv_size);
-        MPI_Bcast(&recv_edges[0], mat_info.recv_size*sizeof(SparseElement<T>), MPI_BYTE, source, MPI_COMM_WORLD);
-        for(int i = 0;  i < mat_info.recv_size; i++)
-        {
-            (*this)(recv_edges[i].getJ(),recv_edges[i].getI()) = (*this)(recv_edges[i].getI(), recv_edges[i].getJ()) = recv_edges[i].getValue();
-        }
-    }
-    else if (mat_info.send_form == _SPARSE_FORM)
-    {
-        this->_rows = mat_info.rows;
-        this->_cols = mat_info.cols;
-        _initializeMatrix(true);
-        std::vector<SparseElement<T> > recv_edges(mat_info.recv_size);
-        MPI_Bcast(&recv_edges[0], mat_info.recv_size*sizeof(SparseElement<T>), MPI_BYTE, source, MPI_COMM_WORLD);
-        for(int i = 0;  i < mat_info.recv_size; i++)
-        {
-            (*this)(recv_edges[i].getI(), recv_edges[i].getJ()) = recv_edges[i].getValue();
-        }
-    }
-}
-#endif
 
 /*
  * DensMatrix copy constructor:
