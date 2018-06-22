@@ -37,11 +37,13 @@ struct IsoRank_Result isoRank(DenseMatrix1D<T>& matrix_A, DenseMatrix1D<T>& matr
     //check to see both adjacency matrices are square and symmetric
     if (!matrix_A.isSquare() || !matrix_B.isSquare())
     {
+        std::cerr << "Matrix is not square" << std::endl;
         throw NotASquareMatrixException();
     }
     
     if (!matrix_A.isSymmetric() || !matrix_B.isSymmetric())
     {
+        std::cerr << "Matrix is not symmetric" << std::endl;
         throw NotASymmetricMatrixException();
     }
     

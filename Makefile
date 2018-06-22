@@ -2,7 +2,7 @@ CC=g++
 # Add -DSEQ for sequential code
 # Add -DNODE_PAIR for node pair method
 # default method is broadcast
-CFLAGS= -O3 -m64 -DEIGEN
+CFLAGS= -O0 -g -m64 -DEIGEN
 INCLUDE= `pkg-config --cflags eigen3`
 LIBRARIES= -lm
 

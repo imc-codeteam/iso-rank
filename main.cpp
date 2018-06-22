@@ -56,15 +56,7 @@ bool G_DEBUG = false;
 /*
  * Preprocessor definitions for the used data type
  */
-#if INT_MATRIX
-typedef int DataType;
-#elif DOUBLE_MATRIX
-typedef double DataType;
-#elif LONG_DOUBLE
-typedef long double DataType;
-#else
 typedef float DataType;
-#endif
 
 /*
  * Function prototypes
@@ -120,7 +112,7 @@ int main(int argc, char * argv[])
         }
         catch (std::exception& e)
         {
-            std::cerr <<"Exception: " << e.what() << '\n' << std::endl;
+            std::cerr <<"Exception encountered on line: " << __LINE__ << ": " << e.what() << '\n' << std::endl;
             itos_converter.str("");
             itos_converter.clear();
         }
@@ -150,7 +142,7 @@ int main(int argc, char * argv[])
             }
             catch (std::exception& e)
             {
-                std::cerr << " Exception: " << e.what() << std::endl;
+                std::cerr <<"Exception encountered on line: " << __LINE__ << ": " << e.what() << '\n' << std::endl;
             }
         }
     }

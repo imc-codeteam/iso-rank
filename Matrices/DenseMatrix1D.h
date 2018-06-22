@@ -22,6 +22,11 @@
 #include <Eigen/Sparse>
 #endif
 
+#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/trim_all.hpp>
+#include <boost/format.hpp>
+#include <boost/lexical_cast.hpp>
+
 template <typename T>
 class DenseMatrix1D;
 
@@ -144,27 +149,34 @@ inline DenseMatrix1D<T>::DenseMatrix1D(const std::string& file_path)
     int tmp_x;
     int tmp_y;
     T tmp_val;
-    std::ifstream file_reader;
-    file_reader.open(file_path.c_str());
+    std::ifstream file_reader(file_path);
     
     if(file_reader.fail())
     {
         file_reader.close();
         throw FileDoesNotExistException(file_path.c_str());
     }
-    
-    file_reader >> this->_rows;
-    file_reader >> this->_cols;
-    
-    _initializeMatrix(true);
-    file_reader >> tmp_x;      //skip the line number
-    
-    while (!file_reader.eof())
-    {
-        file_reader >> tmp_x;
-        file_reader >> tmp_y;
-        file_reader >> tmp_val;
-        (*this)(tmp_x - 1 ,tmp_y - 1) = tmp_val;
+
+    std::string line;
+    std::getline(file_reader, line);
+    std::vector<std::string> pieces;
+    boost::trim(line);
+    boost::split(pieces, line, boost::is_any_of("\t "), boost::token_compress_on);
+
+    this->_rows = this->_cols = pieces.size();
+    _initializeMatrix(0.0);
+
+    for(unsigned int j=0; j<pieces.size(); j++) {
+        (*this)(0, j) = (*this)(j, 0) = boost::lexical_cast<T>(pieces[j]);
+    }
+
+    for(unsigned int i=0; i<this->_rows-1; i++) {
+        std::getline(file_reader, line);
+        boost::trim(line);
+        boost::split(pieces, line, boost::is_any_of("\t "), boost::token_compress_on);
+            for(unsigned int j=i+1; j<pieces.size(); j++) {
+            (*this)(i+1, j) = (*this)(j, i+1) = boost::lexical_cast<T>(pieces[j]);
+        }
     }
     
     file_reader.close();
@@ -244,6 +256,7 @@ inline bool DenseMatrix1D<T>::isSymmetric()
     //sym. matrix has to be square
     if (this->_rows != this->_cols)
     {
+        std::cerr << "Rows does not equal cols" << std::endl;
         return false;
     }
     
@@ -252,8 +265,9 @@ inline bool DenseMatrix1D<T>::isSymmetric()
     {
         for(int j = 0; j < this->_cols; j++)
         {
-            if (this->_edges[(i * this->_cols) + j] != this->_edges[(j * this->_cols) + i])
+            if(std::abs(this->_edges[(i * this->_cols) + j] - this->_edges[(j * this->_cols) + i]) > 1e-4)
             {
+                std::cerr << this->_edges[(i * this->_cols) + j] << " does not equal " << this->_edges[(j * this->_cols) + i] << std::endl;
                 return false;
             }
         }
@@ -503,6 +517,7 @@ inline DenseMatrix1D<T> DenseMatrix1D<T>::diagonalVectorTimesMatrix(const std::v
 {
     if(this->_rows != vec.size())
     {
+        std::cerr << "Dimension mismatch error" << std::endl;
         throw DimensionMismatchException();
     }
     
